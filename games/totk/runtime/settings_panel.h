@@ -113,7 +113,7 @@ static void settings_restore_begin(void) {
  }
  if(!getenv("TOTK_TAA")&&settings_read_int("graphics-taa.txt",&v)&&(v==0||v==1))taa_set(v);
  /* Edge smoothing's resolve, kept in graphics-taa-mode.txt: "fast" (one compute pass) or "metalfx" (the default);
-    TOTK_TAA_FAST decides first. No row of its own yet: the file is written by hand (or by a tool). */
+    TOTK_TAA_FAST decides first. The display page's edge smoothing row (off / fast / MetalFX) writes it. */
  if(!getenv("TOTK_TAA_FAST")&&runtime_setting_word("graphics-taa-mode.txt",word,sizeof word)){
   word[strcspn(word," \t\r\n")]=0;
   if(!strcmp(word,"fast"))taa_set_fast(1);else if(!strcmp(word,"metalfx"))taa_set_fast(0);
@@ -292,8 +292,14 @@ static NSArray<TOTKSettingRow *> *settings_rows(void) {
   [rows addObject:settings_row(aspect,choices,values,^int{
     float now=runtime_aspect_ratio();for(NSUInteger i=0;i<ratios.count;i++)if(aspect_near(now,ratios[i].doubleValue))return (int)i;return -1;},
    ^(int v){float r=ratios[(NSUInteger)v].floatValue;settingsPendingAspect=0;if(runtime_aspect_set_ratio(r)){runtime_front_resize_aspect(r);char word[32];snprintf(word,sizeof word,"%.8g",r);runtime_setting_save("graphics-aspect.txt",word,"aspect ratio");}})];}
- [rows addObject:settings_row(settings_text("边缘平滑（MetalFX 时间性）","Edge smoothing (MetalFX Temporal)"),nil,nil,
-  ^int{return taa_enabled();},^(int v){taa_set(v);settings_save_int("graphics-taa.txt",v,"edge smoothing");})];
+ /* Edge smoothing: off, fast (a classic TAA resolve in one compute pass) or MetalFX (its temporal network; on macOS 27 about
+    4 ms of GPU a frame at 1080p on an M3 Pro, the fast one well under half of that). graphics-taa.txt keeps on / off and
+    graphics-taa-mode.txt the resolve. */
+ [rows addObject:settings_row(settings_text("边缘平滑","Edge smoothing"),
+  @[settings_on_off(0),settings_text("快速","Fast"),@"MetalFX"],@[@0,@1,@2],
+  ^int{return taa_enabled()?(taa_fast_enabled()?1:2):0;},
+  ^(int v){if(v)taa_set_fast(v==1);taa_set(v!=0);settings_save_int("graphics-taa.txt",v!=0,"edge smoothing");
+           if(v)runtime_setting_save("graphics-taa-mode.txt",v==1?"fast":"metalfx","edge smoothing mode");})];
  NSUInteger display=rows.count;
  /* Input */
  TOTKSettingRow *pad=settings_row(settings_text("手柄类型","Controller type"),@[settings_pad_auto_text(),@"Xbox",@"PlayStation",@"Switch"],
