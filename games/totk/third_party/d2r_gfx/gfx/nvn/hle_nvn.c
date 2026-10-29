@@ -643,13 +643,16 @@ static _Atomic int g_sync_lag = -1;
    wait), settles for the one before under TOTK_SYNC_LAG. */
 static _Atomic uint64_t g_sub_fence_last, g_sub_fence_prev;
 void nvn_set_sync_lag(int on) { atomic_store(&g_sync_lag, on != 0); LOG("[flag] sync_lag = %d", on != 0); }
-/* Breath of the Wild has it on by default (user 2026-10-28; 1.6.0 Hebra: 8.78 -> 7.29 ms a frame with p95 unchanged, where
-   Tears of the Kingdom's p95 went up to 22 ms and stays off); TOTK_SYNC_LAG=0 turns it off. */
-#ifdef GAME_BOTW
-#define SYNC_LAG_DEFAULT 1
-#else
+/* Off by default for both games; TOTK_SYNC_LAG=1 (or "flag sync_lag 1") turns it on.
+   Breath of the Wild had it on by default since 2026-10-28 (1.6.0 Hebra: 8.78 -> 7.29 ms a frame with p95 unchanged; Tears
+   of the Kingdom's p95 went up to 22 ms there, so it stays off). 2026-10-29, 1.9.0 on an M3 Pro (120 Hz, MetalFX 2K + key 5,
+   in-session A B B A B A A B, 30 s windows): where the GPU is the bottleneck, every tenth frame (the frames that draw about
+   20 more render passes) waits out the extra frame of GPU work the lag queued and takes ~25 ms, then a few short frames
+   catch up; the display holds that frame for three refreshes. Great Deku Tree: on 90.3 fps, p95 24.4 ms, 1% low 39.7 fps,
+   1,087 frames over 16.7 ms; off 84.2 fps, p95 14.5 ms, 1% low 62.9 fps, 11 over 16.7 ms. A village: on 73.4 fps,
+   p95 25.7 ms, 1% low 36.8 fps; off 68.9 fps, p95 17.8 ms, 1% low 51.0 fps. The GPU stayed busy back to back in both
+   modes, so the lag bought 5-7 % average FPS at the cost of a regular hitch; even frame pacing wins on a 120 Hz screen. */
 #define SYNC_LAG_DEFAULT 0
-#endif
 static int sync_lag_on(void) { int v = atomic_load(&g_sync_lag); if (v < 0) { const char *e = getenv("TOTK_SYNC_LAG"); v = e ? atoi(e) > 0 : SYNC_LAG_DEFAULT; atomic_store(&g_sync_lag, v); if (v) LOG("[nvn] TOTK_SYNC_LAG=1：游戏等最近一次提交的 GPU 完成时放宽到上一次提交 | waits for the newest submission settle for the one before it"); } return v; }
 NVN(nvnSyncWait, NVNsyncWaitResult, const NVNsync *s, uint64_t timeout) {
     NVN_BLOCKING();

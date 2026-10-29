@@ -2725,6 +2725,10 @@ void dm_gfx_set_flag(const char *name, int v) {
     if (!strcmp(name, "wb_staged_nowait")) { extern void botw_wb_set_staged_skip(int on); botw_wb_set_staged_skip(v); return; }
 #endif
     if (!strcmp(name, "uncapped_interval")) { extern void nvn_set_uncapped_interval(int on); nvn_set_uncapped_interval(v); return; }
+    /* A/B switches for settings the panel holds: edge smoothing (key 5's TAA) and the frame lock (0 off, 30 ... 120),
+       so one session can alternate them in the same scene. */
+    if (!strcmp(name, "taa")) { taa_set(v < 0 ? !taa_enabled() : v); MLOG("[flag] taa = %d", taa_enabled()); return; }
+    if (!strcmp(name, "fps_lock")) { extern void nvn_fps_lock_set(int); extern int nvn_fps_lock(void); nvn_fps_lock_set(v); MLOG("[flag] fps_lock = %d", nvn_fps_lock()); return; }
     if (!strcmp(name, "occl_visible")) { atomic_store(&g_occl_vis, v); MLOG("[flag] occl_visible = %d", v); return; }
     if (!strcmp(name, "drvfill")) { atomic_store(&g_drvfill_on, v != 0); MLOG("[flag] drvfill = %d", v != 0); return; }
     if (!strcmp(name, "ubo_snapshot")) { (void)usnap_on(); atomic_store(&g_usnap_on, v != 0); MLOG("[flag] ubo_snapshot = %d", v != 0); return; }
