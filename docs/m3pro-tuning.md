@@ -15,7 +15,11 @@ scene, cache and temperature. "1 % low" is 1000 / the 99th-percentile frame time
    `SYNC_LAG_DEFAULT`). `TOTK_SYNC_LAG=1` or `flag sync_lag 1` turns it back on.
 2. **Two A/B flags** for settings the panel holds: `flag taa <0|1>` (edge smoothing) and `flag fps_lock <0|30|...|120>`
    (`nvn_mtl.m`, `dm_gfx_set_flag`).
-3. **tools/ab-bench**: the harness above.
+3. **Fast edge smoothing** (`totk_taa.m`, opt-in): a classic TAA resolve in one compute pass on key 5's own jitter,
+   motion vectors and reactive mask, instead of MetalFX's temporal network. The settings panel's edge smoothing row is now
+   off / fast / MetalFX (kept in `graphics-taa.txt` and `graphics-taa-mode.txt`); `TOTK_TAA_FAST=1` or
+   `flag taa_fast 1` select it too, `TOTK_TAA_FAST_ALPHA` / `TOTK_TAA_FAST_GAMMA` tune it. MetalFX stays the default.
+4. **tools/ab-bench**: the harness above.
 
 ### Why sync lag off (Breath of the Wild 1.9.0, MetalFX 2K + edge smoothing)
 
@@ -47,6 +51,15 @@ depth.
   scaler on macOS 27 is a neural network (BRNet); on this M3 Pro part of it also runs on the Neural Engine, and the commit
   that submits it costs the render thread about 1 ms a frame (`sample`: `ANEServicesProgramProcessRequestDirect` under
   `q4_commit`).
+- **MetalFX's own switches do not make it cheaper here.** The framework reads `MTLFX_TEMPORAL_SCALER_VERSION` (BRNet3,
+  BRNet4, BRNet4_Fused, BBRNet1, BBRNet1_Fused) and `MTLFX_FORCE_GPU`. One session each, shrine, MetalFX 2K + edge
+  smoothing (FPS / GPU ms a frame): default 98.9 / 8.32, BRNet3 97.6 / 8.39, BRNet4_Fused 98.0 / 8.39, BBRNet1_Fused
+  98.8 / 8.33, `MTLFX_FORCE_GPU=1` 91.2 / 9.17 (the Neural Engine offload helps), edge smoothing off 143.7 / 4.34.
+- **Fast edge smoothing vs MetalFX's** (shrine, MetalFX 2K, in-session A/B): fast 122.6 FPS, 1 % low 93.6, GPU
+  6.1 ms a frame, 1.0 % of presents held; MetalFX 95.4 FPS, 1 % low 76.0, GPU 8.6 ms, 25.9 % held. Still frames of the
+  same view look alike at 2x (both smooth the stair steps that "off" shows); frames in the middle of a camera pan show no
+  trails on Link or the light beams. Not yet checked: dense foliage in the open world, where variance clipping can let
+  thin bright detail shimmer more than the network does.
 - **Frame lock 120 vs uncapped (144)**: no difference where the game runs below 120 (shrine with edge smoothing: 98.8 vs
   98.9 FPS). It matters where it would run above 120: frames the panel can never show are not rendered.
 - **Latency**: with the GPU saturated a frame reaches the screen 30-40 ms after its GPU work ends (per-frame TSV,
@@ -58,4 +71,5 @@ depth.
 - A present queue of its own (or committing the present ahead of the next frame's work) for the latency above.
 - MetalFX output straight into the drawable (drawable sized to the 16:9 picture, Core Animation letterboxing it): saves the
   full-screen present pass, about 0.3-0.5 ms a frame at 3600x2025.
-- A cheaper edge smoothing: the classic (non-neural) TAA resolve on the existing jitter / motion / depth / reactive inputs.
+- Fast edge smoothing: a sharpening pass (RCAS) and object motion (it follows the camera only, like key 5's MetalFX
+  path; the reactive mask and clipping handle characters).
