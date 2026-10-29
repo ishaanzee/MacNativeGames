@@ -112,6 +112,12 @@ static void settings_restore_begin(void) {
   else if(!strcmp(word,"off")||!strcmp(word,"off\n")){nvn_fps_lock_set(0);dm_gfx_set_flag("mfx_interp",MFX_OFF);}
  }
  if(!getenv("TOTK_TAA")&&settings_read_int("graphics-taa.txt",&v)&&(v==0||v==1))taa_set(v);
+ /* Edge smoothing's resolve, kept in graphics-taa-mode.txt: "fast" (one compute pass) or "metalfx" (the default);
+    TOTK_TAA_FAST decides first. No row of its own yet: the file is written by hand (or by a tool). */
+ if(!getenv("TOTK_TAA_FAST")&&runtime_setting_word("graphics-taa-mode.txt",word,sizeof word)){
+  word[strcspn(word," \t\r\n")]=0;
+  if(!strcmp(word,"fast"))taa_set_fast(1);else if(!strcmp(word,"metalfx"))taa_set_fast(0);
+ }
  const char *output=getenv("TOTK_OUTPUT_RES");
  if((!output||!*output||!strcmp(output,"auto"))&&!getenv("TOTK_MFX_OUTPUT")&&!getenv("TOTK_MFX_UPSCALE")&&
     settings_read_int("graphics-output.txt",&v)&&v<=OUTPUT_MODE_720P)settingsPendingOutput=v;
